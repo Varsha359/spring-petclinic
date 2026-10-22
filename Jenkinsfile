@@ -8,7 +8,6 @@ pipeline {
     }
 
     parameters {
-        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Branch to build (e.g. main, develop, feature/vet-specialty-update)')
         booleanParam(name: 'FORCE_STS', defaultValue: false, description: 'Force Smart Test Selection execution regardless of branch name')
     }
 
@@ -36,11 +35,20 @@ pipeline {
         // =========================================================================
         stage('1. SCM Checkout & Environment') {
             steps {
-                echo '================================================================='
-                echo ' [SDLC Phase 1] SCM Checkout & Toolchain Verification'
-                echo " Building Branch : ${env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'main'}"
-                echo " Commit Hash     : ${env.GIT_COMMIT ?: 'HEAD'}"
-                echo '================================================================='
+                script {
+                    def resolvedBranch = ""
+                    if (env.JOB_NAME && env.JOB_NAME.contains('/')) {
+                        def rawBranch = env.JOB_NAME.tokenize('/').last()
+                        resolvedBranch = java.net.URLDecoder.decode(rawBranch, 'UTF-8')
+                    } else {
+                        resolvedBranch = env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'main'
+                    }
+                    echo '================================================================='
+                    echo ' [SDLC Phase 1] SCM Checkout & Toolchain Verification'
+                    echo " Building Branch : ${resolvedBranch}"
+                    echo " Commit Hash     : ${env.GIT_COMMIT ?: 'HEAD'}"
+                    echo '================================================================='
+                }
                 sh '''
                     echo "--> Java Runtime Environment:"
                     java -version
@@ -97,7 +105,24 @@ pipeline {
                 echo ' [SDLC Phase 5] STS Branch Lineage & Dynamic Test Selection'
                 echo '================================================================='
                 script {
-                    def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: (params.BRANCH_NAME ?: 'main')
+                    def branchName = ""
+                    if (env.JOB_NAME && env.JOB_NAME.contains('/')) {
+                        def rawBranch = env.JOB_NAME.tokenize('/').last()
+                        branchName = java.net.URLDecoder.decode(rawBranch, 'UTF-8')
+                    } else {
+                        branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'main'
+                    }
+
+                    // Fallback to git inspection if needed
+                    if (!branchName || branchName == 'main') {
+                        try {
+                            def gitB = sh(script: 'git name-rev --name-only HEAD', returnStdout: true).trim()
+                            if (gitB && !gitB.contains('undefined')) {
+                                branchName = gitB.replace('remotes/origin/', '').replace('origin/', '')
+                            }
+                        } catch (Exception e) {}
+                    }
+
                     def isFeatureBranch = (params.FORCE_STS == true) || branchName.toLowerCase().contains('feature') || branchName.toLowerCase().contains('feat')
                     echo "--> Current Branch: '${branchName}' (Feature Branch: ${isFeatureBranch})"
 
