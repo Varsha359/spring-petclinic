@@ -7,6 +7,11 @@ pipeline {
         timestamps()
     }
 
+    parameters {
+        string(name: 'BRANCH_NAME', defaultValue: 'main', description: 'Branch to build (e.g. main, develop, feature/vet-specialty-update)')
+        booleanParam(name: 'FORCE_STS', defaultValue: false, description: 'Force Smart Test Selection execution regardless of branch name')
+    }
+
     triggers {
         // Continuous Integration: Poll SCM every 2 minutes for changes pushed to this branch
         pollSCM('H/2 * * * *')
@@ -98,8 +103,8 @@ pipeline {
                 echo ' [SDLC Phase 5] STS Branch Lineage & Dynamic Test Selection'
                 echo '================================================================='
                 script {
-                    def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'main'
-                    def isFeatureBranch = branchName.contains('feature')
+                    def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: (params.BRANCH_NAME ?: 'main')
+                    def isFeatureBranch = (params.FORCE_STS == true) || branchName.toLowerCase().contains('feature') || branchName.toLowerCase().contains('feat')
                     echo "--> Current Branch: '${branchName}' (Feature Branch: ${isFeatureBranch})"
 
                     if (isFeatureBranch && fileExists("${STS_PROJECT_DIR}/.venv/bin/python3")) {
@@ -107,7 +112,16 @@ pipeline {
                         sh """
                             mkdir -p "${WORKSPACE}/target"
                             mkdir -p /tmp/matplotlib-jenkins
+                            export MPLCONFIGDIR=/tmp/matplotlib-jenkins
+
+                            # Fetch develop base reference from origin so git merge-base succeeds
+                            git -C "${WORKSPACE}" fetch origin develop:refs/remotes/origin/develop 2>/dev/null || true
+                            git -C "${WORKSPACE}" fetch origin develop:develop 2>/dev/null || true
+
                             cd "${STS_PROJECT_DIR}"
+                            if [ -f .env ]; then
+                                export \$(grep -v '^#' .env | xargs)
+                            fi
 
                             echo "--> Step 5.1: Detecting parent branch lineage..."
                             .venv/bin/python3 -m sts.cli branch --repo "${WORKSPACE}" || true
@@ -140,7 +154,7 @@ pipeline {
                     def filterArg = hasFilter ? readFile(file: "${MAVEN_FILTER_FILE}").trim() : ""
 
                     if (filterArg && filterArg.length() > 0) {
-                        echo "--> [STS ACTIVE] Running selected affected test suite: -Dtest=${filterArg}"
+                        echo "--> [STS ACTIVE] Running ONLY selected affected tests: -Dtest=${filterArg}"
                         sh "mvn test -Dtest=\"${filterArg}\""
                     } else {
                         echo "--> [STANDARD CI] Running core regression test suite..."
@@ -164,8 +178,9 @@ pipeline {
                 script {
                     if (fileExists("${STS_PROJECT_DIR}/.venv/bin/python3")) {
                         sh """
+                            export MPLCONFIGDIR=/tmp/matplotlib-jenkins
                             cd "${STS_PROJECT_DIR}"
-                            .venv/bin/python3 -m sts.cli evaluate --repo "${WORKSPACE}" || true
+                            .venv/bin/python3 -m sts.cli evaluate --repo "${WORKSPACE}" --ci-mode || true
                         """
                     } else {
                         echo "--> STS engine directory not found; skipping benchmark recording."
