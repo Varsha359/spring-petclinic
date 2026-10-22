@@ -48,4 +48,19 @@ class OwnerTests {
 		assertEquals(1, owner.getPets().size());
 	}
 
+	@Test
+	void testGetNumberOfPetsAndHasPets() {
+		Owner owner = new Owner();
+		assertEquals(0, owner.getNumberOfPets());
+		assertTrue(!owner.hasPets());
+
+		Pet pet = new Pet();
+		pet.setId(10);
+		pet.setName("Max");
+		owner.addPet(pet);
+
+		assertEquals(1, owner.getNumberOfPets());
+		assertTrue(owner.hasPets());
+	}
+
 }

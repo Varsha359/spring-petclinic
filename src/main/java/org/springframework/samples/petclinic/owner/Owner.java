@@ -97,6 +97,14 @@ public class Owner extends Person {
 		return this.pets;
 	}
 
+	public int getNumberOfPets() {
+		return getPets().size();
+	}
+
+	public boolean hasPets() {
+		return !getPets().isEmpty();
+	}
+
 	public void addPet(Pet pet) {
 		if (pet == null) {
 			return;
