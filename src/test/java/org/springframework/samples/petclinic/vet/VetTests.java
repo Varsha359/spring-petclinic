@@ -38,4 +38,15 @@ class VetTests {
 		assertThat(other.getId()).isEqualTo(vet.getId());
 	}
 
+	@Test
+	void testHasSpecialties() {
+		Vet vet = new Vet();
+		assertThat(vet.hasSpecialties()).isFalse();
+
+		Specialty specialty = new Specialty();
+		specialty.setName("radiology");
+		vet.addSpecialty(specialty);
+		assertThat(vet.hasSpecialties()).isTrue();
+	}
+
 }
