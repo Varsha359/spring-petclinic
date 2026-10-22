@@ -60,13 +60,7 @@ pipeline {
                 echo '================================================================='
                 echo ' [SDLC Phase 2] Static Code Analysis & Code Quality Checks'
                 echo '================================================================='
-                sh '''
-                    echo "--> Checking Java formatting standards (Spring JavaFormat)..."
-                    mvn spring-javaformat:validate
-
-                    echo "--> Executing Checkstyle static rule analysis..."
-                    mvn checkstyle:check@nohttp-checkstyle-validation
-                '''
+                sh 'mvn spring-javaformat:validate checkstyle:check@nohttp-checkstyle-validation -T 1C --batch-mode'
             }
         }
 
@@ -76,9 +70,9 @@ pipeline {
         stage('3. Build & Compilation') {
             steps {
                 echo '================================================================='
-                echo ' [SDLC Phase 3] Clean Build & Source Code Compilation'
+                echo ' [SDLC Phase 3] Source Code Compilation & Syntax Validation'
                 echo '================================================================='
-                sh 'mvn clean compile'
+                sh 'mvn compile -T 1C --batch-mode'
             }
         }
 
@@ -90,7 +84,7 @@ pipeline {
                 echo '================================================================='
                 echo ' [SDLC Phase 4] Software Bill of Materials (SBOM) Generation'
                 echo '================================================================='
-                sh 'mvn cyclonedx:makeAggregateBom'
+                sh 'mvn cyclonedx:makeAggregateBom -T 1C --batch-mode'
             }
         }
 
@@ -123,13 +117,7 @@ pipeline {
                                 export \$(grep -v '^#' .env | xargs)
                             fi
 
-                            echo "--> Step 5.1: Detecting parent branch lineage..."
-                            .venv/bin/python3 -m sts.cli branch --repo "${WORKSPACE}" || true
-
-                            echo "--> Step 5.2: Analyzing code diff hunks against parent branch..."
-                            .venv/bin/python3 -m sts.cli diff --repo "${WORKSPACE}" || true
-
-                            echo "--> Step 5.3: Executing AST parsing + LLM behavioral analysis..."
+                            echo "--> Executing Smart Test Selection (AST + Gemini AI)..."
                             .venv/bin/python3 -m sts.cli select \
                                 --repo "${WORKSPACE}" \
                                 --output-file "${MAVEN_FILTER_FILE}" || true
@@ -155,14 +143,11 @@ pipeline {
 
                     if (filterArg && filterArg.length() > 0) {
                         echo "--> [STS ACTIVE] Running ONLY selected affected tests: -Dtest=${filterArg}"
-                        sh "mvn test -Dtest=\"${filterArg}\""
+                        sh "mvn test jacoco:report -Dtest=\"${filterArg}\" -T 1C --batch-mode"
                     } else {
-                        echo "--> [STANDARD CI] Running core regression test suite..."
-                        sh 'mvn test -Dtest=OwnerTests,VetTests,PetValidatorTests'
+                        echo "--> [STANDARD CI] Running full application test suite (no STS filter)..."
+                        sh 'mvn test jacoco:report -T 1C --batch-mode'
                     }
-
-                    echo "--> Generating JaCoCo code coverage report..."
-                    sh 'mvn jacoco:report'
                 }
             }
         }
@@ -199,7 +184,7 @@ pipeline {
                 echo '================================================================='
                 sh '''
                     echo "--> Packaging Spring Boot executable JAR..."
-                    mvn package -DskipTests
+                    mvn package -DskipTests -T 1C --batch-mode
 
                     echo "--> Generating SHA-256 artifact checksum..."
                     shasum -a 256 target/spring-petclinic-*.jar > target/checksums.sha256
