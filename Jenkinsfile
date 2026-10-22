@@ -80,12 +80,6 @@ pipeline {
         // SDLC PHASE 4: SECURITY & SUPPLY CHAIN AUDIT (SBOM)
         // =========================================================================
         stage('4. Security & SBOM Generation') {
-            when {
-                expression {
-                    def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: (params.BRANCH_NAME ?: 'main')
-                    return !branchName.toLowerCase().contains('feature') && !branchName.toLowerCase().contains('feat')
-                }
-            }
             steps {
                 echo '================================================================='
                 echo ' [SDLC Phase 4] Software Bill of Materials (SBOM) Generation'
@@ -151,8 +145,8 @@ pipeline {
                         echo "--> [STS ACTIVE] Running ONLY selected affected tests: -Dtest=${filterArg}"
                         sh "mvn test jacoco:report -Dtest=\"${filterArg}\" -T 1C --batch-mode"
                     } else {
-                        echo "--> [STANDARD CI] Running core regression test suite..."
-                        sh 'mvn test jacoco:report -Dtest=OwnerTests,VetTests,PetValidatorTests -T 1C --batch-mode'
+                        echo "--> [STANDARD CI] Running full application test suite (no STS filter)..."
+                        sh 'mvn test jacoco:report -T 1C --batch-mode'
                     }
                 }
             }
@@ -184,12 +178,6 @@ pipeline {
         // SDLC PHASE 8: PACKAGING & ARTIFACT ARCHIVAL
         // =========================================================================
         stage('8. Packaging & Artifact Integrity') {
-            when {
-                expression {
-                    def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: (params.BRANCH_NAME ?: 'main')
-                    return !branchName.toLowerCase().contains('feature') && !branchName.toLowerCase().contains('feat')
-                }
-            }
             steps {
                 echo '================================================================='
                 echo ' [SDLC Phase 8] Packaging Production Executable Artifact'
@@ -208,12 +196,6 @@ pipeline {
         // SDLC PHASE 9: CONTINUOUS DELIVERY (CD) / STAGING VERIFICATION GATE
         // =========================================================================
         stage('9. CD Deployment & Staging Gate') {
-            when {
-                expression {
-                    def branchName = env.BRANCH_NAME ?: env.GIT_BRANCH ?: (params.BRANCH_NAME ?: 'main')
-                    return !branchName.toLowerCase().contains('feature') && !branchName.toLowerCase().contains('feat')
-                }
-            }
             steps {
                 echo '================================================================='
                 echo ' [SDLC Phase 9] Continuous Delivery - Staging Verification Gate'
